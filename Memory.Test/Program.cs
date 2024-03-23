@@ -8,11 +8,12 @@ var natsOptions = NatsOpts.Default;
 natsOptions = natsOptions with { Url = "localhost" };
 await using var nats = new NatsConnection(natsOptions);
 var js = new NatsJSContext(nats);
-var config = new StreamConfig(name: "EVENTS", subjects: new[] { "events.>" });
+var config = new StreamConfig(name: "EVENTSV2", subjects: new[] { "eventsv2.>" });
 config.Storage = StreamConfigStorage.File;
 var stream = await js.CreateStreamAsync(config);
 
 var tasks = new List<Task>();
+var data = new byte[1024];
 for (int i = 0; i < 1000; i++)
 {
     var task = Task.Run(async () =>
@@ -22,16 +23,16 @@ for (int i = 0; i < 1000; i++)
             var sw = Stopwatch.StartNew();
             for (var i = 0; i < 2; i++)
             {
-                await js.PublishAsync<object>(subject: "events.page_loaded", data: null);
-                await js.PublishAsync<object>(subject: "events.mouse_clicked", data: null);
-                await js.PublishAsync<object>(subject: "events.mouse_clicked", data: null);
-                await js.PublishAsync<object>(subject: "events.page_loaded", data: null);
-                await js.PublishAsync<object>(subject: "events.mouse_clicked", data: null);
-                await js.PublishAsync<object>(subject: "events.input_focused", data: null);
+                await js.PublishAsync<object>(subject: "eventsv2.page_loaded", data: data);
+                await js.PublishAsync<object>(subject: "eventsv2.mouse_clicked", data: data);
+                await js.PublishAsync<object>(subject: "eventsv2.mouse_clicked", data: data);
+                await js.PublishAsync<object>(subject: "eventsv2.page_loaded", data: data);
+                await js.PublishAsync<object>(subject: "eventsv2.mouse_clicked", data: data);
+                await js.PublishAsync<object>(subject: "eventsv2.input_focused", data: data);
             }
 
             //await PrintStreamStateAsync(stream);
-            Console.WriteLine($"Total time taken: {sw.Elapsed.TotalSeconds}");
+            Console.WriteLine($"V2 Total time taken: {sw.Elapsed.TotalSeconds}");
         }
     });
     tasks.Add(task);
