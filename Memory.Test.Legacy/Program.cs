@@ -1,4 +1,5 @@
-﻿using NATS.Client.JetStream;
+﻿using System.Collections.Concurrent;
+using NATS.Client.JetStream;
 using NATS.Client;
 using System.Diagnostics;
 
@@ -13,28 +14,29 @@ jetStreamManagement.AddStream(StreamConfiguration.Builder()
                 .WithStorageType(StorageType.File)
                 .WithSubjects("eventsv1.>")
                 .Build());
+jetStreamManagement.PurgeStream("EVENTSV1");
 
 var tasks = new List<Task>();
 var data = new byte[1024];
-for (int i = 0; i < 1000; i++)
+var elapsed = new ConcurrentBag<double>();
+var threads = new ConcurrentBag<int>();
+
+for (var i = 0; i < 1000; i++)
 {
     var task = Task.Run(async () =>
     {
-        while (true)
+        var sw = new Stopwatch();
+        for (var j = 0; j < 100; j++)
         {
-            var sw = Stopwatch.StartNew();
-            for (var i = 0; i < 2; i++)
-            {
-                await jetStream.PublishAsync(subject: "eventsv1.page_loaded", data: data);
-                await jetStream.PublishAsync(subject: "eventsv1.mouse_clicked", data: data);
-                await jetStream.PublishAsync(subject: "eventsv1.mouse_clicked", data: data);
-                await jetStream.PublishAsync(subject: "eventsv1.page_loaded", data: data);
-                await jetStream.PublishAsync(subject: "eventsv1.mouse_clicked", data: data);
-                await jetStream.PublishAsync(subject: "eventsv1.input_focused", data: data);
-            }
-
-            //PrintStreamStateAsync(jetStreamManagement.GetStreamInfo("EVENTS"));
-            Console.WriteLine($"V1 Total time taken: {sw.Elapsed.TotalSeconds}");
+            sw.Restart();
+            await jetStream.PublishAsync(subject: "eventsv1.page_loaded", data: data);
+            await jetStream.PublishAsync(subject: "eventsv1.mouse_clicked", data: data);
+            await jetStream.PublishAsync(subject: "eventsv1.mouse_clicked", data: data);
+            await jetStream.PublishAsync(subject: "eventsv1.page_loaded", data: data);
+            await jetStream.PublishAsync(subject: "eventsv1.mouse_clicked", data: data);
+            await jetStream.PublishAsync(subject: "eventsv1.input_focused", data: data);
+            elapsed.Add(sw.Elapsed.TotalSeconds);
+            threads.Add(ThreadPool.ThreadCount);
         }
     });
     tasks.Add(task);
@@ -42,8 +44,7 @@ for (int i = 0; i < 1000; i++)
 
 await Task.WhenAll(tasks);
 
-void PrintStreamStateAsync(StreamInfo jsStream)
-{
-    var state = jsStream.State;
-    Console.WriteLine($"Stream has {state.Messages} messages using {state.Bytes} bytes");
-}
+var stream = jetStreamManagement.GetStreamInfo("EVENTSV1");
+var state = stream.State;
+Console.WriteLine($"Stream has {state.Messages} messages using {state.Bytes} bytes");
+Console.WriteLine($"V1 Avg: {elapsed.Average():F3}, Min: {elapsed.Min():F3}, Max: {elapsed.Max():F3}, Max Threads: {threads.Max()}");
